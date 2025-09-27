@@ -100,7 +100,7 @@ export default function Learn() {
           for (const syll of text.syllables) {
             syll.forEach((item) => {
               const audio = new Audio(`/audio/${item.replace(".", "")}.mp3`);
-              audio.preload = true;
+              audio.preload = "auto";
             });
           }
         }
