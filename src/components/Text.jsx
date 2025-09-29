@@ -1,10 +1,9 @@
 import clsx from "clsx";
 import { useEffect, useMemo, useRef } from "react";
-import { useLearnReading } from "../store";
+import { MODE, useLearnReading } from "../store";
 
 function playAudio(text) {
   let name = text.replace(".", "");
-  console.log(name);
   const audio = new Audio(`/audio/${name}.mp3`);
   audio.onloadedmetadata = () => {
     audio.play();
@@ -12,16 +11,25 @@ function playAudio(text) {
 }
 
 export default function Text({ value, props, isSyllable = false }) {
-  const { textProps } = useLearnReading();
+  const { textProps, mode } = useLearnReading();
 
   const activeWord = useRef(null);
   const ref = useRef();
   const syllableText = useMemo(() => {
-    return splitWordsBySyllable(value);
-  }, [value]);
+    if (mode === MODE.WORD) {
+      return splitWords(value);
+    } else {
+      return splitWordsBySyllable(value);
+    }
+  }, [value, mode]);
 
   useEffect(() => {
     if (!ref.current) return;
+
+    const hoverElement = ["text-blue-600", "z-10"];
+    if (isSyllable) {
+      hoverElement.push("scale-125");
+    }
 
     const handleInteractive = (event) => {
       const clientX = event.touches ? event.touches[0].clientX : event.clientX;
@@ -33,25 +41,16 @@ export default function Text({ value, props, isSyllable = false }) {
         targetElement.classList.contains("words") &&
         targetElement !== activeWord.current
       ) {
-        targetElement.classList.add("scale-125", "text-blue-600", "z-10");
+        targetElement.classList.add(...hoverElement);
 
         if (activeWord.current) {
-          activeWord.current.classList.remove(
-            "scale-125",
-            "text-blue-600",
-            "z-10"
-          );
+          activeWord.current.classList.remove(...hoverElement);
         }
         activeWord.current = targetElement;
-        console.log(targetElement.innerText);
         playAudio(targetElement.innerText);
       } else if (!targetElement.classList.contains("words")) {
         if (activeWord.current) {
-          activeWord.current.classList.remove(
-            "scale-125",
-            "text-blue-600",
-            "z-10"
-          );
+          activeWord.current.classList.remove(...hoverElement);
         }
         activeWord.current = null;
       }
@@ -59,28 +58,24 @@ export default function Text({ value, props, isSyllable = false }) {
 
     const handleTouchEnd = () => {
       if (activeWord.current) {
-        activeWord.current.classList.remove(
-          "scale-125",
-          "text-blue-600",
-          "z-10"
-        );
+        activeWord.current.classList.remove(...hoverElement);
         activeWord.current = null;
       }
     };
 
     const element = ref.current;
-    element.addEventListener("mousedown", handleInteractive);
+    element.addEventListener("mousemove", handleInteractive);
     element.addEventListener("touchstart", handleInteractive);
     element.addEventListener("touchmove", handleInteractive);
     element.addEventListener("touchend", handleTouchEnd);
 
     return () => {
-      element.removeEventListener("mousedown", handleInteractive);
+      element.removeEventListener("mousemove", handleInteractive);
       element.removeEventListener("touchstart", handleInteractive);
       element.removeEventListener("touchmove", handleInteractive);
       element.removeEventListener("touchend", handleTouchEnd);
     };
-  }, []);
+  }, [isSyllable, mode]);
 
   return (
     <>
@@ -98,7 +93,7 @@ export default function Text({ value, props, isSyllable = false }) {
                 <>
                   <span
                     className={clsx(
-                      "words text-xl pb-5 transition-all px-[4px]",
+                      "words text-xl pb-5 transition-all",
                       isSyllable && "px-2"
                     )}
                     style={{
@@ -124,13 +119,13 @@ export default function Text({ value, props, isSyllable = false }) {
             </div>
           ) : (
             <span
-              className="words text-xl pb-5 transition-all py-2"
+              className="words text-xl pb-5 transition-all"
               style={{
-                fontSize: props?.fontSize || 12,
+                fontSize: textProps?.fontSize || 12,
                 paddingBottom: textProps.fontSize || 20,
               }}
             >
-              {syllableText}
+              {word}
             </span>
           )
         )}
@@ -151,25 +146,26 @@ function startsWithDigraph(s) {
 }
 
 function syllabifyWord(word) {
-  const w = word.toLowerCase();
-  const chars = [...w];
+  const lower = word.toLowerCase();
+  const chars = [...word]; // simpan huruf asli
+  const charsLower = [...lower]; // untuk logika
   const out = [];
   let i = 0;
 
   while (i < chars.length) {
-    // onset: kumpulkan konsonan sebelum vokal
+    // onset
     let onset = "";
-    while (i < chars.length && !isVowel(chars[i])) {
-      onset += chars[i++];
+    while (i < chars.length && !isVowel(charsLower[i])) {
+      onset += chars[i++]; // pakai huruf asli
     }
 
-    // nucleus: ambil 1 vokal atau diftong
+    // nucleus
     let nucleus = "";
-    if (i < chars.length && isVowel(chars[i])) {
+    if (i < chars.length && isVowel(charsLower[i])) {
       if (i + 1 < chars.length) {
-        const two = chars[i] + chars[i + 1];
+        const two = charsLower[i] + charsLower[i + 1];
         if (DIPHTHONGS.includes(two)) {
-          nucleus = two;
+          nucleus = chars[i] + chars[i + 1]; // huruf asli
           i += 2;
         } else {
           nucleus = chars[i++];
@@ -185,10 +181,11 @@ function syllabifyWord(word) {
       break;
     }
 
-    // kumpulkan cluster konsonan hingga vokal berikutnya
+    // cluster konsonan
     const consStart = i;
-    while (i < chars.length && !isVowel(chars[i])) i++;
+    while (i < chars.length && !isVowel(charsLower[i])) i++;
     const cluster = chars.slice(consStart, i).join("");
+    const clusterLower = charsLower.slice(consStart, i).join("");
 
     if (i === chars.length) {
       out.push(onset + nucleus + cluster);
@@ -201,7 +198,7 @@ function syllabifyWord(word) {
       out.push(onset + nucleus);
       i = consStart;
     } else {
-      if (startsWithDigraph(cluster)) {
+      if (startsWithDigraph(clusterLower)) {
         out.push(onset + nucleus);
         i = consStart;
       } else {
@@ -217,9 +214,14 @@ export function splitWordsBySyllable(sentence) {
   const words = sentence.split(" ");
 
   const result = words.map((word) => {
-    // const syllableRegex = /[bcdfghjklmnpqrstvwxyz]*[aiueo]+/gi;
     return syllabifyWord(word);
   });
 
   return result;
+}
+
+export function splitWords(sentence) {
+  const words = sentence.split(" ");
+  console.log(words);
+  return words;
 }
