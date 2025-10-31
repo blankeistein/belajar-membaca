@@ -5,11 +5,13 @@ export const MODE = {
   LETTER: "letter",
 };
 
-export const useLearnReading = create((set, get) => ({
+export const useLearnReading = create((set) => ({
   mode: MODE.LETTER,
   textProps: {
     fontSize: 20,
   },
+  pages: undefined,
+  audios: {},
 
   toggleMode: () => {
     set((state) => {
@@ -41,4 +43,41 @@ export const useLearnReading = create((set, get) => ({
       };
     });
   },
+
+  setPages: (pages) => {
+    if (!pages) {
+      set({ pages: null });
+    } else {
+      const newPages = pages.map((page) => {
+        return addMissingIds(page);
+      });
+
+      set({ pages: newPages });
+    }
+  },
+
+  setAudio: (audio) => {
+    set((state) => {
+      state.audios = audio;
+
+      return { ...state, audios: audio };
+    });
+  },
 }));
+
+export const generateUniqueId = () =>
+  "id-" + Math.random().toString(36).substring(2, 9);
+
+function addMissingIds(component) {
+  if (typeof component === "object" && component != null) {
+    if (!component.hasOwnProperty("id")) {
+      component["id"] = generateUniqueId();
+
+      if (Array.isArray(component.childrens)) {
+        component.childrens = component.childrens.map(addMissingIds);
+      }
+    }
+  }
+
+  return component;
+}

@@ -1,17 +1,18 @@
 import clsx from "clsx";
-import { useEffect, useMemo, useRef } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef } from "react";
 import { MODE, useLearnReading } from "../store";
 
-function playAudio(text) {
-  let name = text.replace(".", "");
-  const audio = new Audio(`/audio/${name}.mp3`);
-  audio.onloadedmetadata = () => {
-    audio.play();
-  };
-}
+// function playAudio(text) {
+//   let name = text.replace(".", "");
+//   const audio = new Audio(`/audio/${name}.mp3`);
+//   audio.onloadedmetadata = () => {
+//     audio.play();
+//   };
+// }
 
-export default function Text({ value, props, isSyllable = false }) {
-  const { textProps, mode } = useLearnReading();
+export default function Text({ id, value, props, isSyllable = false }) {
+  const cacheAudio = useRef({});
+  const { textProps, mode, audios } = useLearnReading();
 
   const activeWord = useRef(null);
   const ref = useRef();
@@ -77,6 +78,26 @@ export default function Text({ value, props, isSyllable = false }) {
     };
   }, [isSyllable, mode]);
 
+  const playAudio = useCallback(
+    (text) => {
+      let name = text.replace(".", "").toLowerCase();
+
+      let audio = cacheAudio.current[name];
+      if (!audio) {
+        audio = new Audio(audios[name.toLowerCase()]);
+
+        cacheAudio.current[name] = audio;
+
+        audio.load();
+      }
+
+      audio.play().catch((error) => {
+        console.error("Audio playback error:", error);
+      });
+    },
+    [audios]
+  );
+
   return (
     <>
       <div
@@ -86,39 +107,40 @@ export default function Text({ value, props, isSyllable = false }) {
           props?.className
         )}
       >
-        {syllableText.map((word) =>
+        {syllableText.map((word, key) =>
           Array.isArray(word) ? (
-            <div className="flex flex-wrap">
+            <div key={"word" + key} className="flex flex-wrap">
               {word.map((char, index) => (
-                <>
+                <Fragment key={char + index}>
                   <span
                     className={clsx(
-                      "words text-xl pb-5 transition-all",
+                      "words text-xl pb-16 transition-all",
                       isSyllable && "px-2"
                     )}
                     style={{
                       fontSize: textProps.fontSize || 12,
-                      paddingBottom: textProps.fontSize || 20,
+                      paddingBottom: textProps.fontSize + 20 || 20,
                     }}
                   >
                     {char}
                   </span>
                   {isSyllable && index !== word.length - 1 && (
                     <span
-                      className="text-xl pb-5"
+                      className="text-xl pb-16"
                       style={{
                         fontSize: textProps.fontSize || 12,
-                        paddingBottom: textProps.fontSize || 20,
+                        paddingBottom: textProps.fontSize + 20 || 20,
                       }}
                     >
                       -
                     </span>
                   )}
-                </>
+                </Fragment>
               ))}
             </div>
           ) : (
             <span
+              key={"word" + key}
               className="words text-xl pb-5 transition-all"
               style={{
                 fontSize: textProps?.fontSize || 12,

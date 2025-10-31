@@ -1,15 +1,23 @@
-import { IconButton, Spinner, Typography } from "@material-tailwind/react";
+import {
+  Button,
+  IconButton,
+  Spinner,
+  Typography,
+} from "@material-tailwind/react";
+import JSZip from "jszip";
 import {
   AArrowDownIcon,
   AArrowUpIcon,
   CaseLowerIcon,
   ChevronLeftIcon,
+  FileIcon,
   PlayIcon,
   WholeWordIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
 import ComponentRenderer from "./components/ComponentRenderer";
-import { data } from "./data";
+import { getBook, getResourceAsBlob } from "./firebase";
 import { MODE, useLearnReading } from "./store";
 
 function getTextComponent(component) {
@@ -28,17 +36,18 @@ function getTextComponent(component) {
 }
 
 export default function Learn() {
-  const { changeTextProps, textProps, mode, toggleMode } = useLearnReading();
-  const [pages, setPages] = useState(null);
+  const {
+    pages,
+    audios,
+    changeTextProps,
+    textProps,
+    mode,
+    toggleMode,
+    setAudio,
+    setPages,
+  } = useLearnReading();
+
   const [page, setPage] = useState(0);
-
-  useEffect(() => {
-    getData();
-  }, []);
-
-  const getData = useCallback(() => {
-    setTimeout(() => setPages(data), 20000);
-  }, []);
 
   const handleIncreaseFont = useCallback(
     (newSize = null) => {
@@ -62,6 +71,15 @@ export default function Learn() {
     [textProps.fontSize]
   );
 
+  const handleLoadData = (config) => {
+    if (config) {
+      setAudio(config.audio);
+      setPages(config.data);
+    } else {
+      setPages(null);
+    }
+  };
+
   useEffect(() => {
     if (!pages) return;
 
@@ -71,6 +89,7 @@ export default function Learn() {
         if (text.syllables) {
           for (const syll of text.syllables) {
             syll.forEach((item) => {
+              console.log(item.replace(".", ""));
               const audio = new Audio(`/audio/${item.replace(".", "")}.mp3`);
               audio.preload = "auto";
             });
@@ -78,50 +97,53 @@ export default function Learn() {
         }
       }
     }
-  }, [pages, page]);
+  }, [pages, page, audios]);
+
+  if (pages === undefined) return <LoadingPage onLoadData={handleLoadData} />;
+
+  if (pages === null) return <Page404 />;
 
   return (
     <>
-      <div className="mx-auto grid grid-rows-[1fr_max-content] max-w-lg w-full bg-[#F0F7FF] h-screen px-1">
-        {pages === null && (
-          <div className="flex flex-col gap-4 justify-center items-center">
-            <Spinner />
-            <Typography type="small">Memuat data</Typography>
-          </div>
-        )}
+      <div className="mx-auto w-full bg-[#F0F7FF] h-screen px-1 pb-[64px]">
         {pages && (
-          <div className="overflow-y-auto">
+          <div className="overflow-y-auto p-4">
             <ComponentRenderer data={pages[page]} />
           </div>
         )}
         {pages && (
-          <div className="flex justify-between gap-2 p-1">
+          <div className="fixed bottom-0 left-[50%] translate-x-[-50%] flex w-full justify-between gap-2 p-4">
             <IconButton
               onClick={() => setPage((prev) => (prev === 0 ? 0 : prev - 1))}
               disabled={page === 0}
+              size="xl"
             >
               <ChevronLeftIcon />
             </IconButton>
 
-            <IconButton onClick={toggleMode}>
+            <IconButton onClick={toggleMode} size="xl">
               {mode === MODE.LETTER ? <WholeWordIcon /> : <CaseLowerIcon />}
             </IconButton>
-            <IconButton onClick={() => window.alert("Playing content")}>
+            <IconButton
+              onClick={() => window.alert("Playing content")}
+              size="xl"
+            >
               <PlayIcon />
             </IconButton>
-            <IconButton onClick={handleDecreaseFont}>
+            <IconButton onClick={handleDecreaseFont} size="xl">
               <AArrowDownIcon />
             </IconButton>
-            <IconButton onClick={handleIncreaseFont}>
+            <IconButton onClick={handleIncreaseFont} size="xl">
               <AArrowUpIcon />
             </IconButton>
             <IconButton
               onClick={() =>
                 setPage((prev) =>
-                  prev > data.length - 1 ? data.length - 1 : prev + 1
+                  prev > pages.length - 1 ? pages.length - 1 : prev + 1
                 )
               }
-              disabled={page >= data.length - 1}
+              disabled={page >= pages.length - 1}
+              size="xl"
             >
               <ChevronLeftIcon className="-scale-x-100" />
             </IconButton>
@@ -131,3 +153,127 @@ export default function Learn() {
     </>
   );
 }
+
+const Page404 = () => {
+  return (
+    <div className="mx-auto flex flex-col gap-5 items-center justify-center max-w-lg w-full bg-[#F0F7FF] h-screen px-1">
+      <Typography type="small">Not Found</Typography>
+    </div>
+  );
+};
+
+const LoadingPage = ({ onLoadData }) => {
+  const { pageId } = useParams();
+
+  useEffect(() => {
+    console.log("Fetching book data for ID:", pageId);
+    getBook(pageId)
+      .then(async (bookData) => {
+        if (!bookData) return onLoadData(null);
+
+        if (bookData.url && bookData.id) {
+          const fileBlob = await getResourceAsBlob(bookData.url);
+          handleLoadData(fileBlob);
+        }
+      })
+      .catch((error) => {
+        console.error("Error fetching book data:", error);
+      });
+  }, [pageId]);
+
+  const handleLoadData = useCallback(async (file) => {
+    if (!file) return;
+    try {
+      let data = {};
+      const zip = await JSZip.loadAsync(file);
+      const mapAudio = {};
+      const audios = zip.folder("audio");
+
+      for (const file of Object.values(audios.files)) {
+        if (file.name.startsWith("audio/") && !file.dir) {
+          let filename = file.name.replace("audio/", "");
+          let key = filename.replace(".mp3", "");
+
+          const blob = await file.async("blob");
+          mapAudio[key] = URL.createObjectURL(blob);
+        }
+      }
+
+      const config = await zip.file("data.json").async("string");
+
+      data["data"] = JSON.parse(config);
+      data["audio"] = mapAudio;
+
+      onLoadData(data);
+    } catch (e) {
+      window.alert("Terjadi error");
+      console.error(e);
+    }
+  }, []);
+
+  return (
+    <div className="mx-auto flex flex-col gap-5 items-center justify-center max-w-lg w-full bg-[#F0F7FF] h-screen px-1">
+      <Spinner />
+      <Typography type="small">Memuat data</Typography>
+    </div>
+  );
+};
+
+const EmptyPage = ({ onLoadData }) => {
+  const [file, setFile] = useState(null);
+
+  const handleFileChange = (event) => {
+    const target = event.target;
+    if (target.files[0]) {
+      setFile(target.files[0]);
+    }
+
+    target.value = "";
+  };
+
+  const handleLoadData = useCallback(async () => {
+    if (!file) return;
+    try {
+      let data = {};
+      const zip = await JSZip.loadAsync(file);
+      const mapAudio = {};
+      const audios = zip.folder("audio");
+
+      for (const file of Object.values(audios.files)) {
+        if (file.name.startsWith("audio/") && !file.dir) {
+          let filename = file.name.replace("audio/", "");
+          let key = filename.replace(".mp3", "");
+
+          const blob = await file.async("blob");
+          mapAudio[key] = URL.createObjectURL(blob);
+        }
+      }
+
+      const config = await zip.file("data.json").async("string");
+
+      data["data"] = JSON.parse(config);
+      data["audio"] = mapAudio;
+
+      onLoadData(data);
+    } catch (e) {
+      window.alert("Terjadi error");
+      console.error(e);
+    }
+  }, [file]);
+
+  return (
+    <div className="mx-auto flex flex-col gap-5 items-center justify-center max-w-lg w-full bg-[#F0F7FF] h-screen px-1">
+      <Button as="label">
+        <FileIcon className="size-4 mr-1" />
+        {file ? file.name : "Tambahkan File ...."}
+        <input
+          type="file"
+          hidden
+          onChange={handleFileChange}
+          accept="application/zip"
+        />
+      </Button>
+      <Button onClick={handleLoadData}>Muat</Button>
+    </div>
+  );
+};

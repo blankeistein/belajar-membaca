@@ -6,16 +6,21 @@ import App from "./App.jsx";
 import "./index.css";
 import Learn from "./Learn.jsx";
 
-const router = createBrowserRouter([
+const router = createBrowserRouter(
+  [
+    {
+      path: "/",
+      Component: App,
+    },
+    {
+      path: "/:pageId",
+      Component: Learn,
+    },
+  ],
   {
-    path: "/",
-    Component: App,
-  },
-  {
-    path: "/:pageId",
-    Component: Learn,
-  },
-]);
+    basename: "/belajar-membaca/",
+  }
+);
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
