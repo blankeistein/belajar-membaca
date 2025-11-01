@@ -34,12 +34,10 @@ async function getResourceAsBlob(url, props) {
   const cachedResponse = await cache.match(url);
 
   if (cachedResponse) {
-    // Jika ada di cache, langsung kembalikan sebagai blob
-    if (onProgress) onProgress({ loaded: 1, total: 1 }); // Cache hit is instant
+    if (onProgress) onProgress({ loaded: 1, total: 1 });
     return cachedResponse.blob();
   }
 
-  // Jika tidak ada di cache, unduh dengan axios
   const axiosResponse = await axios.get(url, {
     responseType: "blob",
     onDownloadProgress: (progressEvent) => {
@@ -53,7 +51,6 @@ async function getResourceAsBlob(url, props) {
     );
   }
 
-  // Buat Response object dari data blob axios untuk disimpan di cache
   const responseToCache = new Response(axiosResponse.data);
   await cache.put(url, responseToCache);
 
