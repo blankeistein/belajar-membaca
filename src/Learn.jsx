@@ -150,7 +150,10 @@ export default function Learn() {
 
 const Page404 = () => {
   return (
-    <div className="mx-auto flex flex-col gap-5 items-center justify-center max-w-lg w-full bg-[#F0F7FF] h-screen px-1">
+    <div className="mx-auto flex flex-col gap-5 items-center justify-center w-full bg-[#F0F7FF] h-screen px-1">
+      <Typography type="h1" as="h1" sx={{ fontSize: 32 }}>
+        404
+      </Typography>
       <Typography type="small">Not Found</Typography>
     </div>
   );
@@ -158,22 +161,6 @@ const Page404 = () => {
 
 const LoadingPage = ({ onLoadData }) => {
   const { pageId } = useParams();
-
-  useEffect(() => {
-    getBook(pageId)
-      .then(async (bookData) => {
-        if (!bookData) return onLoadData(null);
-
-        if (bookData.url && bookData.id) {
-          const fileBlob = await getResourceAsBlob(bookData.url);
-          handleLoadData(fileBlob);
-        }
-      })
-      .catch((error) => {
-        console.error("Error fetching book data:", error);
-      });
-  }, [pageId, handleLoadData, onLoadData]);
-
   const handleLoadData = useCallback(
     async (file) => {
       if (!file) return;
@@ -206,6 +193,21 @@ const LoadingPage = ({ onLoadData }) => {
     },
     [onLoadData]
   );
+
+  useEffect(() => {
+    getBook(pageId)
+      .then(async (bookData) => {
+        if (!bookData) return onLoadData(null);
+
+        if (bookData.url && bookData.id) {
+          const fileBlob = await getResourceAsBlob(bookData.url);
+          handleLoadData(fileBlob);
+        }
+      })
+      .catch((error) => {
+        console.error("Error fetching book data:", error);
+      });
+  }, [pageId, handleLoadData, onLoadData]);
 
   return (
     <div className="mx-auto flex flex-col gap-5 items-center justify-center w-full bg-[#F0F7FF] h-screen px-1">

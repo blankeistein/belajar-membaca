@@ -3,14 +3,6 @@ import { Fragment, useCallback, useEffect, useMemo, useRef } from "react";
 import { MODE, useLearnReading } from "../store";
 import { splitWords, splitWordsBySyllable } from "../utils";
 
-// function playAudio(text) {
-//   let name = text.replace(".", "");
-//   const audio = new Audio(`/audio/${name}.mp3`);
-//   audio.onloadedmetadata = () => {
-//     audio.play();
-//   };
-// }
-
 export default function Text({ value, props, isSyllable = false }) {
   const cacheAudio = useRef({});
   const { textProps, mode, audios } = useLearnReading();
@@ -24,6 +16,26 @@ export default function Text({ value, props, isSyllable = false }) {
       return splitWordsBySyllable(value);
     }
   }, [value, mode]);
+
+  const playAudio = useCallback(
+    (text) => {
+      let name = text.replace(".", "").toLowerCase();
+
+      let audio = cacheAudio.current[name];
+      if (!audio) {
+        audio = new Audio(audios[name.toLowerCase()]);
+
+        cacheAudio.current[name] = audio;
+
+        audio.load();
+      }
+
+      audio.play().catch((error) => {
+        console.error("Audio playback error:", error);
+      });
+    },
+    [audios]
+  );
 
   useEffect(() => {
     if (!ref.current) return;
@@ -78,26 +90,6 @@ export default function Text({ value, props, isSyllable = false }) {
       element.removeEventListener("touchend", handleTouchEnd);
     };
   }, [isSyllable, mode, playAudio]);
-
-  const playAudio = useCallback(
-    (text) => {
-      let name = text.replace(".", "").toLowerCase();
-
-      let audio = cacheAudio.current[name];
-      if (!audio) {
-        audio = new Audio(audios[name.toLowerCase()]);
-
-        cacheAudio.current[name] = audio;
-
-        audio.load();
-      }
-
-      audio.play().catch((error) => {
-        console.error("Audio playback error:", error);
-      });
-    },
-    [audios]
-  );
 
   return (
     <>
