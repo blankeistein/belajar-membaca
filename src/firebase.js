@@ -1,3 +1,4 @@
+import axios from "axios";
 import { getApp, getApps, initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { get, getDatabase, ref } from "firebase/database";
@@ -26,29 +27,37 @@ async function getBook(bookId) {
   return snapshot.exists() ? snapshot.val() : null;
 }
 
-async function getResourceAsBlob(url, cacheName = "resorce-cache-v1") {
-  let cache = await caches.open(cacheName);
-  let response = await cache.match(url);
+async function getResourceAsBlob(url, props) {
+  const { cacheName = "resource-cache-v1", onProgress } = props;
 
-  if (!response) {
-    response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(
-        `Gagal mengunduh: ${response.status} ${response.statusText}`
-      );
-    }
+  const cache = await caches.open(cacheName);
+  const cachedResponse = await cache.match(url);
 
-    const responseClone = response.clone();
-    await cache.put(url, responseClone);
+  if (cachedResponse) {
+    // Jika ada di cache, langsung kembalikan sebagai blob
+    if (onProgress) onProgress({ loaded: 1, total: 1 }); // Cache hit is instant
+    return cachedResponse.blob();
   }
 
-  if (response) {
-    return response.blob();
+  // Jika tidak ada di cache, unduh dengan axios
+  const axiosResponse = await axios.get(url, {
+    responseType: "blob",
+    onDownloadProgress: (progressEvent) => {
+      if (onProgress) onProgress(progressEvent);
+    },
+  });
+
+  if (axiosResponse.status !== 200) {
+    throw new Error(
+      `Gagal mengunduh: ${axiosResponse.status} ${axiosResponse.statusText}`
+    );
   }
 
-  throw new Error(
-    "Gagal mendapatkan respons (response) dari cache maupun jaringan."
-  );
+  // Buat Response object dari data blob axios untuk disimpan di cache
+  const responseToCache = new Response(axiosResponse.data);
+  await cache.put(url, responseToCache);
+
+  return axiosResponse.data;
 }
 
 export { app, auth, db, storage, getBook, getResourceAsBlob };

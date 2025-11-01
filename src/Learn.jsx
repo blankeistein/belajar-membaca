@@ -1,4 +1,4 @@
-import { IconButton, Spinner, Typography } from "@material-tailwind/react";
+import { IconButton, Progress, Typography } from "@material-tailwind/react";
 import JSZip from "jszip";
 import {
   AArrowDownIcon,
@@ -161,12 +161,24 @@ const Page404 = () => {
 
 const LoadingPage = ({ onLoadData }) => {
   const { pageId } = useParams();
+  const [progress, setProgress] = useState(0);
+  const [status, setStatus] = useState("Menyiapkan...");
+
   const handleLoadData = useCallback(
     async (file) => {
       if (!file) return;
       try {
         let data = {};
-        const zip = await JSZip.loadAsync(file);
+        setStatus("Membuka file...");
+        const zip = await JSZip.loadAsync(file, {
+          onUpdate: (metadata) => {
+            setProgress(metadata.percent);
+          },
+        });
+
+        setProgress(100);
+        setStatus("Memproses audio...");
+
         const mapAudio = {};
         const audios = zip.folder("audio");
 
@@ -180,6 +192,7 @@ const LoadingPage = ({ onLoadData }) => {
           }
         }
 
+        setStatus("Menyelesaikan...");
         const config = await zip.file("data.json").async("string");
 
         data["data"] = JSON.parse(config);
@@ -187,32 +200,51 @@ const LoadingPage = ({ onLoadData }) => {
 
         onLoadData(data);
       } catch (e) {
-        window.alert("Terjadi error");
+        window.alert("Terjadi error saat memuat data.");
         console.error(e);
+        onLoadData(null);
       }
     },
     [onLoadData]
   );
 
   useEffect(() => {
+    setStatus("Mengunduh data buku...");
     getBook(pageId)
       .then(async (bookData) => {
         if (!bookData) return onLoadData(null);
 
         if (bookData.url && bookData.id) {
-          const fileBlob = await getResourceAsBlob(bookData.url);
+          const fileBlob = await getResourceAsBlob(bookData.url, {
+            onProgress: (progress) => {
+              const percentCompleted = Math.floor(
+                (progress.loaded * 100) / progress.total
+              );
+              setProgress(percentCompleted);
+            },
+          });
           handleLoadData(fileBlob);
         }
       })
       .catch((error) => {
         console.error("Error fetching book data:", error);
+        onLoadData(null);
       });
   }, [pageId, handleLoadData, onLoadData]);
 
   return (
-    <div className="mx-auto flex flex-col gap-5 items-center justify-center w-full bg-[#F0F7FF] h-screen px-1">
-      <Spinner />
-      <Typography type="small">Memuat data</Typography>
+    <div className="mx-auto flex flex-col gap-5 items-center justify-center w-full bg-[#F0F7FF] h-screen px-4">
+      <div className="w-full max-w-sm">
+        <div className="flex items-center justify-between mb-2">
+          <Typography color="blue-gray" variant="h6">
+            {status}
+          </Typography>
+          <Typography color="blue-gray" variant="h6">
+            {Math.round(progress)}%
+          </Typography>
+        </div>
+        <Progress value={progress} color="blue" />
+      </div>
     </div>
   );
 };
