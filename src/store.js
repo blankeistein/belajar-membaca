@@ -8,19 +8,21 @@ export const MODE = {
 export const useLearnReading = create((set) => ({
   mode: MODE.LETTER,
   textProps: {
-    fontSize: 20,
+    fontSize: 24,
   },
   pages: undefined,
   audios: {},
 
   toggleMode: () => {
-    set((state) => {
-      if (state.mode === MODE.LETTER) {
-        return { ...state, mode: MODE.WORD };
-      } else {
-        return { ...state, mode: MODE.LETTER };
-      }
-    });
+    window.alert("Fitur masih dalam pengembangan");
+    return;
+    // set((state) => {
+    //   if (state.mode === MODE.LETTER) {
+    //     return { ...state, mode: MODE.WORD };
+    //   } else {
+    //     return { ...state, mode: MODE.LETTER };
+    //   }
+    // });
   },
 
   setMode: (mode) => {
@@ -70,7 +72,7 @@ export const generateUniqueId = () =>
 
 function addMissingIds(component) {
   if (typeof component === "object" && component != null) {
-    if (!component.hasOwnProperty("id")) {
+    if (!component["id"]) {
       component["id"] = generateUniqueId();
 
       if (Array.isArray(component.childrens)) {

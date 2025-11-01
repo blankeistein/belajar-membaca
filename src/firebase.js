@@ -20,9 +20,6 @@ const auth = getAuth(app);
 const db = getDatabase(app);
 const storage = getStorage(app);
 
-// connectDatabaseEmulator(db, "127.0.0.1", 9000);
-// connectStorageEmulator(storage, "127.0.0.1", 9199);
-
 async function getBook(bookId) {
   const bookRef = ref(db, "BelajarMembaca/" + bookId);
   const snapshot = await get(bookRef);
@@ -34,19 +31,15 @@ async function getResourceAsBlob(url, cacheName = "resorce-cache-v1") {
   let response = await cache.match(url);
 
   if (!response) {
-    try {
-      response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(
-          `Gagal mengunduh: ${response.status} ${response.statusText}`
-        );
-      }
-
-      const responseClone = response.clone();
-      await cache.put(url, responseClone);
-    } catch (err) {
-      throw err;
+    response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(
+        `Gagal mengunduh: ${response.status} ${response.statusText}`
+      );
     }
+
+    const responseClone = response.clone();
+    await cache.put(url, responseClone);
   }
 
   if (response) {

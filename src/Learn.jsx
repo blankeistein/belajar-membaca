@@ -1,16 +1,10 @@
-import {
-  Button,
-  IconButton,
-  Spinner,
-  Typography,
-} from "@material-tailwind/react";
+import { IconButton, Spinner, Typography } from "@material-tailwind/react";
 import JSZip from "jszip";
 import {
   AArrowDownIcon,
   AArrowUpIcon,
   CaseLowerIcon,
   ChevronLeftIcon,
-  FileIcon,
   PlayIcon,
   WholeWordIcon,
 } from "lucide-react";
@@ -57,7 +51,7 @@ export default function Learn() {
         changeTextProps({ fontSize: textProps.fontSize + 2 });
       }
     },
-    [textProps.fontSize]
+    [textProps.fontSize, changeTextProps]
   );
 
   const handleDecreaseFont = useCallback(
@@ -68,7 +62,7 @@ export default function Learn() {
         changeTextProps({ fontSize: textProps.fontSize - 2 });
       }
     },
-    [textProps.fontSize]
+    [textProps.fontSize, changeTextProps]
   );
 
   const handleLoadData = (config) => {
@@ -125,7 +119,7 @@ export default function Learn() {
               {mode === MODE.LETTER ? <WholeWordIcon /> : <CaseLowerIcon />}
             </IconButton>
             <IconButton
-              onClick={() => window.alert("Playing content")}
+              onClick={() => window.alert("Fitur masih dalam pengembangan")}
               size="xl"
             >
               <PlayIcon />
@@ -166,7 +160,6 @@ const LoadingPage = ({ onLoadData }) => {
   const { pageId } = useParams();
 
   useEffect(() => {
-    console.log("Fetching book data for ID:", pageId);
     getBook(pageId)
       .then(async (bookData) => {
         if (!bookData) return onLoadData(null);
@@ -179,101 +172,45 @@ const LoadingPage = ({ onLoadData }) => {
       .catch((error) => {
         console.error("Error fetching book data:", error);
       });
-  }, [pageId]);
+  }, [pageId, handleLoadData, onLoadData]);
 
-  const handleLoadData = useCallback(async (file) => {
-    if (!file) return;
-    try {
-      let data = {};
-      const zip = await JSZip.loadAsync(file);
-      const mapAudio = {};
-      const audios = zip.folder("audio");
+  const handleLoadData = useCallback(
+    async (file) => {
+      if (!file) return;
+      try {
+        let data = {};
+        const zip = await JSZip.loadAsync(file);
+        const mapAudio = {};
+        const audios = zip.folder("audio");
 
-      for (const file of Object.values(audios.files)) {
-        if (file.name.startsWith("audio/") && !file.dir) {
-          let filename = file.name.replace("audio/", "");
-          let key = filename.replace(".mp3", "");
+        for (const file of Object.values(audios.files)) {
+          if (file.name.startsWith("audio/") && !file.dir) {
+            let filename = file.name.replace("audio/", "");
+            let key = filename.replace(".mp3", "");
 
-          const blob = await file.async("blob");
-          mapAudio[key] = URL.createObjectURL(blob);
+            const blob = await file.async("blob");
+            mapAudio[key] = URL.createObjectURL(blob);
+          }
         }
+
+        const config = await zip.file("data.json").async("string");
+
+        data["data"] = JSON.parse(config);
+        data["audio"] = mapAudio;
+
+        onLoadData(data);
+      } catch (e) {
+        window.alert("Terjadi error");
+        console.error(e);
       }
-
-      const config = await zip.file("data.json").async("string");
-
-      data["data"] = JSON.parse(config);
-      data["audio"] = mapAudio;
-
-      onLoadData(data);
-    } catch (e) {
-      window.alert("Terjadi error");
-      console.error(e);
-    }
-  }, []);
+    },
+    [onLoadData]
+  );
 
   return (
-    <div className="mx-auto flex flex-col gap-5 items-center justify-center max-w-lg w-full bg-[#F0F7FF] h-screen px-1">
+    <div className="mx-auto flex flex-col gap-5 items-center justify-center w-full bg-[#F0F7FF] h-screen px-1">
       <Spinner />
       <Typography type="small">Memuat data</Typography>
-    </div>
-  );
-};
-
-const EmptyPage = ({ onLoadData }) => {
-  const [file, setFile] = useState(null);
-
-  const handleFileChange = (event) => {
-    const target = event.target;
-    if (target.files[0]) {
-      setFile(target.files[0]);
-    }
-
-    target.value = "";
-  };
-
-  const handleLoadData = useCallback(async () => {
-    if (!file) return;
-    try {
-      let data = {};
-      const zip = await JSZip.loadAsync(file);
-      const mapAudio = {};
-      const audios = zip.folder("audio");
-
-      for (const file of Object.values(audios.files)) {
-        if (file.name.startsWith("audio/") && !file.dir) {
-          let filename = file.name.replace("audio/", "");
-          let key = filename.replace(".mp3", "");
-
-          const blob = await file.async("blob");
-          mapAudio[key] = URL.createObjectURL(blob);
-        }
-      }
-
-      const config = await zip.file("data.json").async("string");
-
-      data["data"] = JSON.parse(config);
-      data["audio"] = mapAudio;
-
-      onLoadData(data);
-    } catch (e) {
-      window.alert("Terjadi error");
-      console.error(e);
-    }
-  }, [file]);
-
-  return (
-    <div className="mx-auto flex flex-col gap-5 items-center justify-center max-w-lg w-full bg-[#F0F7FF] h-screen px-1">
-      <Button as="label">
-        <FileIcon className="size-4 mr-1" />
-        {file ? file.name : "Tambahkan File ...."}
-        <input
-          type="file"
-          hidden
-          onChange={handleFileChange}
-          accept="application/zip"
-        />
-      </Button>
-      <Button onClick={handleLoadData}>Muat</Button>
     </div>
   );
 };
