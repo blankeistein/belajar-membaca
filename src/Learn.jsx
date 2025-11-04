@@ -1,18 +1,24 @@
-import { IconButton, Progress, Typography } from "@material-tailwind/react";
+import {
+  Button,
+  IconButton,
+  Progress,
+  Typography,
+} from "@material-tailwind/react";
 import JSZip from "jszip";
 import {
   AArrowDownIcon,
   AArrowUpIcon,
   CaseLowerIcon,
   ChevronLeftIcon,
+  PauseIcon,
   PlayIcon,
   WholeWordIcon,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import ComponentRenderer from "./components/ComponentRenderer";
 import { getBook, getResourceAsBlob } from "./firebase";
-import { MODE, useLearnReading } from "./store";
+import { MODE, useAudioPlayer, useLearnReading } from "./store";
 
 function getTextComponent(component) {
   const text = [];
@@ -39,9 +45,17 @@ export default function Learn() {
     toggleMode,
     setAudio,
     setPages,
+    cacheAudio,
+    setCacheAudio,
   } = useLearnReading();
 
+  const { isPlaying, setIsPlaying } = useAudioPlayer();
+  // const [indexPlay, setIndexPlay] = useState(0);
+  const currentPlaying = useRef(false);
+  const indexPlay = useRef(0);
+
   const [page, setPage] = useState(0);
+  const [isStart, setIsStart] = useState(false);
 
   const handleIncreaseFont = useCallback(
     (newSize = null) => {
@@ -74,6 +88,79 @@ export default function Learn() {
     }
   };
 
+  const handleToggleMode = useCallback(() => {
+    currentPlaying.current = false;
+    indexPlay.current = 0;
+    toggleMode();
+  }, []);
+
+  const handlePlayAudio = useCallback(async () => {
+    if (isPlaying) {
+      currentPlaying.current = false;
+
+      return;
+    }
+    const words = document.querySelectorAll(".words");
+    currentPlaying.current = true;
+
+    setIsPlaying(true);
+    try {
+      for (const [key, word] of Object.entries(words)) {
+        if (!currentPlaying.current) {
+          break;
+        }
+
+        if (indexPlay.current > 0 && key < indexPlay.current) {
+          continue;
+        }
+
+        word.classList.add("active");
+        let name = word.innerText.replace(/[,.?!]/g, "").toLowerCase();
+        let audio = cacheAudio[name];
+
+        if (!audio) {
+          audio = new Audio(audios[name.toLowerCase()]);
+
+          setCacheAudio(name, audio);
+          cacheAudio[name] = audio;
+
+          audio.load();
+        }
+
+        audio.play().catch((error) => {
+          console.error("Audio playback error:", error);
+        });
+
+        if (word.innerText.search(/[,.?!]/g) === -1) {
+          await new Promise((res) => setTimeout(res, 1000));
+        } else {
+          await new Promise((res) => setTimeout(res, 1500));
+        }
+        word.classList.remove("active");
+        indexPlay.current += 1;
+
+        if (key == words.length - 1) {
+          indexPlay.current = 0;
+        }
+      }
+    } finally {
+      setIsPlaying(false);
+      currentPlaying.current = false;
+    }
+  }, [audios, isPlaying]);
+
+  const handlePrevPage = useCallback(() => {
+    currentPlaying.current = false;
+    indexPlay.current = 0;
+    setPage((prev) => (prev === 0 ? 0 : prev - 1));
+  }, [pages]);
+
+  const handleNextPage = useCallback(() => {
+    currentPlaying.current = false;
+    indexPlay.current = 0;
+    setPage((prev) => (prev > pages.length - 1 ? pages.length - 1 : prev + 1));
+  }, [pages]);
+
   useEffect(() => {
     if (!pages) return;
 
@@ -83,7 +170,6 @@ export default function Learn() {
         if (text.syllables) {
           for (const syll of text.syllables) {
             syll.forEach((item) => {
-              console.log(item.replace(".", ""));
               const audio = new Audio(`/audio/${item.replace(".", "")}.mp3`);
               audio.preload = "auto";
             });
@@ -99,30 +185,40 @@ export default function Learn() {
 
   return (
     <>
-      <div className="mx-auto w-full bg-[#F0F7FF] h-screen px-1 pb-[64px]">
+      {!isStart && pages && (
+        <div className="fixed h-full w-full bg-slate-50 flex flex-col justify-center items-center z-50">
+          <div className="overflow-hidden rounded-xl mb-8 shadow-lg">
+            <img src="/thumbnail-book.webp" width={240} height={240} />
+          </div>
+          <Button onClick={() => setIsStart(true)}>Buka Buku</Button>
+        </div>
+      )}
+
+      <div className="mx-auto w-full bg-[#F0F7FF] h-[calc(100vh-72px)] px-1 mb-[64px]">
         {pages && (
           <div className="overflow-y-auto p-4">
             <ComponentRenderer data={pages[page]} />
           </div>
         )}
         {pages && (
-          <div className="fixed bottom-0 left-[50%] translate-x-[-50%] flex w-full justify-between gap-2 p-4">
+          <div className="fixed bottom-0 left-[50%] translate-x-[-50%] flex w-full justify-between gap-2 p-4 bg-[#F0F7FF]">
             <IconButton
-              onClick={() => setPage((prev) => (prev === 0 ? 0 : prev - 1))}
+              onClick={handlePrevPage}
               disabled={page === 0}
               size="xl"
             >
               <ChevronLeftIcon />
             </IconButton>
 
-            <IconButton onClick={toggleMode} size="xl">
+            <IconButton onClick={handleToggleMode} size="xl">
               {mode === MODE.LETTER ? <WholeWordIcon /> : <CaseLowerIcon />}
             </IconButton>
             <IconButton
-              onClick={() => window.alert("Fitur masih dalam pengembangan")}
+              onClick={handlePlayAudio}
               size="xl"
+              variant={isPlaying ? "outline" : "solid"}
             >
-              <PlayIcon />
+              {isPlaying ? <PauseIcon /> : <PlayIcon />}
             </IconButton>
             <IconButton onClick={handleDecreaseFont} size="xl">
               <AArrowDownIcon />
@@ -131,11 +227,7 @@ export default function Learn() {
               <AArrowUpIcon />
             </IconButton>
             <IconButton
-              onClick={() =>
-                setPage((prev) =>
-                  prev > pages.length - 1 ? pages.length - 1 : prev + 1
-                )
-              }
+              onClick={handleNextPage}
               disabled={page >= pages.length - 1}
               size="xl"
             >

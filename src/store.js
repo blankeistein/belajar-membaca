@@ -12,17 +12,16 @@ export const useLearnReading = create((set) => ({
   },
   pages: undefined,
   audios: {},
+  cacheAudio: {},
 
   toggleMode: () => {
-    window.alert("Fitur masih dalam pengembangan");
-    return;
-    // set((state) => {
-    //   if (state.mode === MODE.LETTER) {
-    //     return { ...state, mode: MODE.WORD };
-    //   } else {
-    //     return { ...state, mode: MODE.LETTER };
-    //   }
-    // });
+    set((state) => {
+      if (state.mode === MODE.LETTER) {
+        return { ...state, mode: MODE.WORD };
+      } else {
+        return { ...state, mode: MODE.LETTER };
+      }
+    });
   },
 
   setMode: (mode) => {
@@ -65,6 +64,18 @@ export const useLearnReading = create((set) => ({
       return { ...state, audios: audio };
     });
   },
+
+  setCacheAudio: (name, audio) => {
+    set((state) => {
+      return { ...state, cacheAudio: { ...state.cacheAudio, [name]: audio } };
+    });
+  },
+}));
+
+export const useAudioPlayer = create((set) => ({
+  isPlaying: false,
+
+  setIsPlaying: (state) => set({ isPlaying: state }),
 }));
 
 export const generateUniqueId = () =>

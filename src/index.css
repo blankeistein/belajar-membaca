@@ -1,3 +1,7 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+.words.active {
+  @apply text-blue-600 scale-125;
+}

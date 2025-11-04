@@ -1,11 +1,12 @@
 import clsx from "clsx";
 import { Fragment, useCallback, useEffect, useMemo, useRef } from "react";
-import { MODE, useLearnReading } from "../store";
+import { MODE, useAudioPlayer, useLearnReading } from "../store";
 import { splitWords, splitWordsBySyllable } from "../utils";
 
 export default function Text({ value, props, isSyllable = false }) {
-  const cacheAudio = useRef({});
-  const { textProps, mode, audios } = useLearnReading();
+  const { textProps, mode, audios, cacheAudio, setCacheAudio } =
+    useLearnReading();
+  const { isPlaying } = useAudioPlayer();
 
   const activeWord = useRef(null);
   const ref = useRef();
@@ -19,13 +20,16 @@ export default function Text({ value, props, isSyllable = false }) {
 
   const playAudio = useCallback(
     (text) => {
-      let name = text.replace(".", "").toLowerCase();
+      if (isPlaying) return;
+      let name = text.replace(/[,.?!]/g, "").toLowerCase();
 
-      let audio = cacheAudio.current[name];
+      let audio = cacheAudio[name];
+
       if (!audio) {
         audio = new Audio(audios[name.toLowerCase()]);
 
-        cacheAudio.current[name] = audio;
+        setCacheAudio(name, audio);
+        cacheAudio[name] = audio;
 
         audio.load();
       }
@@ -34,7 +38,7 @@ export default function Text({ value, props, isSyllable = false }) {
         console.error("Audio playback error:", error);
       });
     },
-    [audios]
+    [audios, isPlaying]
   );
 
   useEffect(() => {
