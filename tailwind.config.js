@@ -1,4 +1,5 @@
 import { mtConfig } from "@material-tailwind/react";
+import defaultTheme from "tailwindcss/defaultTheme";
 
 /** @type {import('tailwindcss').Config} */
 export default {
@@ -9,6 +10,9 @@ export default {
   ],
   theme: {
     extend: {},
+    fontFamily: {
+      sans: ["Nunito", ...defaultTheme.fontFamily.sans],
+    },
   },
   plugins: [mtConfig],
 };
