@@ -325,7 +325,7 @@ const LoadingPage = ({ onLoadData }) => {
   }, [pageId, handleLoadData, onLoadData]);
 
   return (
-    <div className="mx-auto flex flex-col gap-5 items-center justify-center w-full bg-[#F0F7FF] h-screen px-4">
+    <div className="mx-auto flex flex-col gap-5 items-center justify-center w-full bg-[#fff7f0] h-screen px-4">
       <div className="w-full max-w-sm">
         <div className="flex items-center justify-between mb-2">
           <Typography color="blue-gray" variant="h6">
